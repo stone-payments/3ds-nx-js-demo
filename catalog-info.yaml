@@ -1,0 +1,12 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: tds-nx-js-demo
+  title: "3ds-nx-js-demo"
+  description: "Demonstração de utilização do 3ds-nx-js"
+  namespace: stone
+spec:
+  type: website
+  lifecycle: experimental
+  owner: stone-payments/3ds-developers
+  
