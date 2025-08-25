@@ -1,0 +1,21 @@
+{
+  "name": "3ds-nx-js-demo",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "gen-token-server": "node gen-token-server.js",
+    "demo": "serve -l 3000"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stone-payments/3ds-nx-js-demo.git"
+  },
+  "author": "Stone",
+  "bugs": {
+    "url": "https://github.com/stone-payments/3ds-nx-js-demo/issues"
+  },
+  "homepage": "https://github.com/stone-payments/3ds-nx-js-demo#readme",
+  "dependencies": {
+    "serve": "^14.2.4"
+  }
+}

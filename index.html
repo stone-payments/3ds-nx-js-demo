@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="pt-br">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-LN+7fdVzj6u52u30Kp6M/trliBMCMKTyK833zpbD+pXdCLuTusPj697FH4R/5mcr" crossorigin="anonymous">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-ndDqU0Gzau9qJ1lfW4pNLlhNTkCfHzAVBReH9diLvGRem5+R9g2FzA8ZGN954O5Q"
+    crossorigin="anonymous"></script>
+  <link href="https://fonts.cdnfonts.com/css/ubuntu-mono" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  
+  <!-- For the PRD (production) environment: -->
+  <!-- <script src="https://3ds-nx-js.stone.com.br/live/v2/3ds2.min.js"></script> -->
+
+  <!-- For the SDX (sandbox) environment -->
+  <script src="https://3ds-nx-js.stone.com.br/test/v2/3ds2.min.js"></script>
+
+  <title>Stone 3DS Demo</title>
+</head>
+
+<body>
+  <header>
+    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Logo-Stone.svg/800px-Logo-Stone.svg.png"
+      height="50px" />
+    <div>
+    </div>
+  </header>
+  <main>
+    <div class="container">
+      <!-- Integration Type Selection -->
+      <div class="mb-3">
+        <label class="form-label">Select the type of integration</label>
+        <br>
+        <div class="btn-group" role="group">
+          <input type="radio" class="btn-check" name="btnradio" id="btnRadioNX" autocomplete="off" checked>
+          <label class="btn btn-outline-primary" for="btnRadioNX">3ds-nx</label>
+
+          <input type="radio" class="btn-check" name="btnradio" id="btnRadioHandler" autocomplete="off">
+          <label class="btn btn-outline-primary" for="btnRadioHandler">3ds-handler</label>
+        </div>
+      </div>
+
+      <!-- Secret Key -->
+      <div class="mb-3">
+        <label class="form-label" for="inputSecretKey">Secret Key:</label>
+        <input type="password" class="form-control" id="inputSecretKey" placeholder="Enter your secret key" value=""
+          required>
+      </div>
+
+      <!-- Predefined Card Numbers -->
+      <div class="mb-3">
+        <label class="form-label" for="inputCardNumber">Predefined Card Numbers:</label>
+        <select class="form-select" id="inputCardNumber">
+          <option value="">[Don't override the Order JSON's card number]</option>
+          <option value="">--- 3DS 2.2 ---</option>
+          <option value="5000100411112203">5000100411112203 (3DS Method timeout messageVersion 2.2)</option>
+          <option value="4000100511112003">4000100511112003 (Frictionless 3DS Method messageVersion 2.2)</option>
+          <option value="6000100611112103">6000100611112103 (Frictionless no 3DS Method messageVersion 2.2)</option>
+          <option value="3000100811112072">3000100811112072 (Manual challenge messageVersion 2.2)</option>
+          <option value="7000100911112070">7000100911112070 (Automatic Challenge pass messageVersion 2.2)</option>
+          <option value="3000101011112071">3000101011112071 (Automatic Challenge fail messageVersion 2.2)</option>
+          <option value="">--- 3DS 2.3 ---</option>
+          <option value="5000100411113203">5000100411113203 (3DS Method timeout messageVersion 2.3)</option>
+          <option value="4000100511113003">4000100511113003 (Frictionless 3DS Method messageVersion 2.3)</option>
+          <option value="6000100611113103">6000100611113103 (Frictionless no 3DS Method messageVersion 2.3)</option>
+          <option value="3000100811113072">3000100811113072 (Manual challenge messageVersion 2.3)</option>
+          <option value="7000100911113070">7000100911113070 (Automatic Challenge pass messageVersion 2.3)</option>
+          <option value="3000101011113071">3000101011113071 (Automatic Challenge fail messageVersion 2.3)</option>
+        </select>
+      </div>
+
+      <!-- Order JSON input -->
+      <div id="jsonIntegration" class="mb-3 integration-type">
+        <label for="inputOrderJSON" class="form-label">Order JSON:</label>
+        <textarea id="inputOrderJSON" class="form-control json-editor" rows="15"></textarea>
+      </div>
+
+      <!-- Alert container -->
+      <div id="alertContainer" class="mb-3" style="display: none;">
+        <div id="alertBox" class="alert alert-dismissible fade show" role="alert">
+          <span id="alertMessage"></span>
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <button class="btn btn-primary" id="btnSubmit" onclick="onSubmit()">Submit</button>
+      </div>
+
+      <!-- TDS Method and Challenge containers -->
+      <div id="tdsMethodContainer"></div>
+      <div id="challengeContainer"></div>
+    </div>
+  </main>
+  <script type="module">
+    const env = 'SDX'; // or 'PRD'
+
+    const tdsNxAddress = env === 'PRD'
+      ? 'https://3ds.stone.com.br/v2'
+      : 'https://3ds-sdx.stone.com.br/v2';
+
+    const tdsHandlerAddress = env === 'PRD'
+      ? 'https://api.pagar.me/live/3ds2'
+      : 'https://api.pagar.me/test/3ds2'
+
+    const genTokenApiAddress = 'http://localhost:3333'
+
+    async function getToken() {
+      const isNX = document.getElementById('btnRadioNX').checked;
+      const api = isNX ? tdsNxAddress : tdsHandlerAddress;
+      const sk = document.getElementById('inputSecretKey').value;
+
+      const response = await axios.post(genTokenApiAddress + '/gen-token', {
+        api,
+        secret_key: sk,
+      });
+
+      return response.data.token;
+    }
+
+    async function submitOrder() {
+      // Check if the inputOrderJSON content is a valid JSON
+      const jsonInput = document.getElementById('inputOrderJSON').value;
+      let orderData;
+      try {
+        orderData = JSON.parse(jsonInput);
+      } catch (e) {
+        return showAlert('The Order JSON is not a valid JSON. Please check the format.');
+      }
+
+      // Check if the card number is overridden
+      const cardNumberInput = document.getElementById('inputCardNumber').value;
+      if (cardNumberInput) {
+        // Override the card number in the orderData
+        if (orderData.payments && orderData.payments.length > 0) {
+          const card = orderData.payments[0].credit_card?.card;
+          if (card) {
+            card.number = cardNumberInput;
+          } else {
+            console.warn('No credit card information found in the order data.');
+          }
+        } else {
+          console.warn('No payments found in the order data.');
+        }
+      }
+
+      // Disable the submit button to prevent multiple submissions
+      document.getElementById('btnSubmit').disabled = true;
+
+      const tdsMethodContainer = document.getElementById('tdsMethodContainer');
+      const challengeContainer = document.getElementById('challengeContainer');
+
+      try {
+        // Get the token from the server
+        // WARNING: This operation should be done in the backend in production, but for this demo, we will do it in the frontend
+        const token = await getToken();
+
+        // This is the main function call, which will initiate the 3DS flow
+        const response = await window.Do3DS({
+          token,
+          tdsMethodContainerElement: tdsMethodContainer,
+          challengeContainerElement: challengeContainer,
+          useDefaultChallengeIFrameStyle: false, // Use custom CSS rules for the iframe
+        }, orderData);
+        showAlert("3DS response: " + JSON.stringify(response), 'info');
+      } finally {
+        // Re-enable the submit button
+        document.getElementById('btnSubmit').disabled = false;
+      }
+    }
+
+    window.onSubmit = () => {
+      submitOrder().catch(error => {
+        console.error('Error submitting order:', error);
+        showAlert('An error occurred while submitting the order.\nError: ' + error.message);
+        // Re-enable the submit button
+        document.getElementById('btnSubmit').disabled = false;
+      });
+    }
+
+    // Helper function to show Bootstrap alerts
+    function showAlert(message, type = 'danger') {
+      let alertContainer = document.getElementById('alertContainer');
+      let alertBox = document.getElementById('alertBox');
+      let alertMessage = document.getElementById('alertMessage');
+      
+      // If elements don't exist (removed by Bootstrap dismiss), recreate them
+      if (!alertContainer || !alertBox || !alertMessage) {
+        // Remove any existing container first
+        const existingContainer = document.getElementById('alertContainer');
+        if (existingContainer) {
+          existingContainer.remove();
+        }
+        
+        // Create the alert container
+        alertContainer = document.createElement('div');
+        alertContainer.id = 'alertContainer';
+        alertContainer.className = 'mb-3';
+        alertContainer.style.display = 'none';
+        
+        // Create the alert box
+        alertBox = document.createElement('div');
+        alertBox.id = 'alertBox';
+        alertBox.className = 'alert alert-dismissible fade show';
+        alertBox.setAttribute('role', 'alert');
+        
+        // Create the alert message span
+        alertMessage = document.createElement('span');
+        alertMessage.id = 'alertMessage';
+        
+        // Create the close button
+        const closeButton = document.createElement('button');
+        closeButton.type = 'button';
+        closeButton.className = 'btn-close';
+        closeButton.setAttribute('data-bs-dismiss', 'alert');
+        closeButton.setAttribute('aria-label', 'Close');
+        
+        // Assemble the alert structure
+        alertBox.appendChild(alertMessage);
+        alertBox.appendChild(closeButton);
+        alertContainer.appendChild(alertBox);
+        
+        // Insert the alert container before the submit button
+        const submitButton = document.getElementById('btnSubmit');
+        submitButton.parentNode.insertBefore(alertContainer, submitButton);
+      }
+      
+      // Set the alert type and message
+      alertBox.className = `alert alert-${type} alert-dismissible fade show`;
+      alertMessage.textContent = message;
+      
+      // Show the alert
+      alertContainer.style.display = 'block';
+      
+      // Scroll to the alert
+      alertContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    const exampleOrderJSON = `{
+  "payments": [
+    {
+      "payment_method": "credit_card",
+      "credit_card": {
+        "operation_type": "auth_and_capture",
+        "installments": 3,
+        "statement_descriptor": "LOJA ONLINE",
+        "card": {
+          "number": "3000100811112072",
+          "holder_name": "JOAO SILVA",
+          "holder_document": "12345678901",
+          "exp_month": 12,
+          "exp_year": 2028,
+          "cvv": "123",
+          "brand": "visa",
+          "billing_address": {
+            "country": "BR",
+            "state": "SP",
+            "city": "São Paulo",
+            "zip_code": "01234567",
+            "line_1": "123, Rua das Flores, XXX",
+            "line_2": "Apartamento 45"
+          }
+        },
+        "network_token": {
+          "number": "4000000000001111",
+          "holder_name": "JOAO SILVA",
+          "exp_month": 12,
+          "exp_year": 2028,
+          "cryptograms": "AAABBBCCCdddEEEFFFgggHHH"
+        },
+        "card_id": "card_abc123",
+        "card_token": "tok_xyz789",
+        "recurrence_cycle": "monthly",
+        "initiated_type": "cardholder",
+        "recurrence_model": "subscription",
+        "payment_origin": {
+          "charge_id": "ch_original123",
+          "payment_id": "pay_original456"
+        }
+      },
+      "amount": 20000,
+      "split": [
+        {
+          "amount": 18000,
+          "recipient_id": "rp_main_seller",
+          "type": "percentage",
+          "options": {
+            "charge_processing_fee": true,
+            "charge_remainder_fee": false,
+            "liable": "seller"
+          }
+        },
+        {
+          "amount": 2000,
+          "recipient_id": "rp_marketplace",
+          "type": "flat",
+          "options": {
+            "charge_processing_fee": false,
+            "charge_remainder_fee": true,
+            "liable": "marketplace"
+          }
+        }
+      ]
+    }
+  ],
+  "customer": {
+    "name": "João Silva",
+    "type": "individual",
+    "email": "joao.silva@email.com",
+    "code": "CUST-001",
+    "document": "12345678901",
+    "document_type": "cpf",
+    "gender": "male",
+    "address": {
+      "country": "BR",
+      "state": "SP",
+      "city": "São Paulo",
+      "zip_code": "01234567",
+      "line_1": "123, Rua das Flores, XXX",
+      "line_2": "Apartamento 45"
+    },
+    "phones": {
+      "home_phone": {
+        "country_code": "55",
+        "area_code": "11",
+        "number": "987654321"
+      },
+      "mobile_phone": {
+        "country_code": "55",
+        "area_code": "11",
+        "number": "123456789"
+      }
+    },
+    "birthdate": "1990-05-15",
+    "metadata": {
+      "customer_segment": "premium",
+      "loyalty_level": "gold"
+    }
+  },
+  "items": [
+    {
+      "amount": 15000,
+      "description": "Smartphone Samsung Galaxy",
+      "quantity": 1,
+      "code": "ITEM-001"
+    },
+    {
+      "amount": 5000,
+      "description": "Capa Protetora",
+      "quantity": 2,
+      "code": "ITEM-002"
+    }
+  ],
+  "shipping": {
+    "amount": 1500,
+    "description": "Entrega expressa",
+    "recipient_name": "João Silva",
+    "recipient_phone": "11987654321",
+    "address": {
+      "country": "BR",
+      "state": "SP",
+      "city": "São Paulo",
+      "zip_code": "01234567",
+      "line_1": "123, Rua das Flores, XXX",
+      "line_2": "Apartamento 45"
+    }
+  },
+  "subMerchant": {
+    "merchant_category_code": "5411",
+    "payment_facilitator_code": "PF123456",
+    "code": "SUB_MERCHANT_001",
+    "name": "Loja do João Ltda",
+    "document": "12345678000195",
+    "type": "corporation",
+    "phones": {
+      "home_phone": {
+        "country_code": "55",
+        "area_code": "11",
+        "number": "33334444"
+      },
+      "mobile_phone": {
+        "country_code": "55",
+        "area_code": "11",
+        "number": "999887766"
+      }
+    },
+    "address": {
+      "country": "BR",
+      "state": "SP",
+      "city": "São Paulo",
+      "zip_code": "01234567",
+      "line_1": "Av. Comercial, 789",
+      "line_2": "Sala 101"
+    }
+  },
+  "code": "ORDER-12345",
+  "costumer_id": "customer-uuid-123",
+  "close": true,
+  "ip": "192.168.1.100",
+  "session_id": "sess_abc123def456",
+  "antifraud_enabled": true
+}`;
+
+    if (skEnv) {
+      document.getElementById('inputSecretKey').value = skEnv;
+    }
+
+    document.getElementById('inputOrderJSON').value = exampleOrderJSON;
+  </script>
+</body>
+
+</html>
+
+<style>
+  header {
+    display: block;
+    top: 0;
+    left: 0;
+    width: 100%;
+    text-align: center;
+    padding-top: 30px;
+  }
+
+  /* JSON Editor Styling */
+  .json-editor {
+    font-family: 'Ubuntu Mono', 'Courier New', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+    font-size: 16px;
+    line-height: 1.5;
+    border: 2px solid #dee2e6;
+    border-radius: 6px;
+    padding: 12px;
+    resize: vertical;
+    min-height: 200px;
+    white-space: pre;
+    overflow-wrap: normal;
+    overflow-x: auto;
+    tab-size: 2;
+  }
+
+  .json-editor:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    outline: 0;
+  }
+
+  .json-editor::placeholder {
+    color: #6c757d;
+    font-style: italic;
+  }
+
+  /* Challenge Container Iframe Styling */
+  #challengeContainer iframe {
+    display: block;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 50%;
+    height: 500px;
+    z-index: 1000;
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    background: white;
+  }
+</style>
