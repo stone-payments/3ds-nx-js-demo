@@ -54,7 +54,6 @@ const server = http.createServer(async (req, res) => {
               res.writeHead(200, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ token: parsed.tds_token }));
             } catch (e) {
-              // eslint-disable-next-line no-console
               console.error('Error parsing token response:', e);
               res.writeHead(502);
               res.end('Invalid token response');
@@ -69,7 +68,6 @@ const server = http.createServer(async (req, res) => {
 
         tokenReq.end();
       } catch (e) {
-        // eslint-disable-next-line no-console
         console.error('Error processing request:', e);
         res.writeHead(400);
         res.end('Invalid JSON');
@@ -82,6 +80,5 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  // eslint-disable-next-line no-console
   console.log(`Server running on http://localhost:${PORT}`);
 });
