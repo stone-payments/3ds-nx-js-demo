@@ -1,8 +1,14 @@
 import http from 'http';
 import https from 'https';
 import { URL } from 'url';
+import dotenv from 'dotenv';
 
-const PORT = 3333;
+dotenv.config();
+
+const PORT = process.env.PORT || 3333;
+const ALLOWED_HOSTNAMES = process.env.ALLOWED_HOSTNAMES 
+  ? process.env.ALLOWED_HOSTNAMES.split(',').map(host => host.trim())
+  : ['3ds.stone.com.br', '3ds-sdx.stone.com.br', 'api.pagar.me'];
 
 const setCORS = (res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -31,6 +37,12 @@ const server = http.createServer(async (req, res) => {
         }
 
         const url = new URL(`${api}/tds-token`);
+        
+        if (!ALLOWED_HOSTNAMES.includes(url.hostname)) {
+          res.writeHead(403);
+          return res.end('Hostname not allowed');
+        }
+
         const protocol = url.protocol === 'https:' ? https : http;
 
         const options = {
