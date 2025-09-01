@@ -16,6 +16,7 @@
   },
   "homepage": "https://github.com/stone-payments/3ds-nx-js-demo#readme",
   "dependencies": {
+    "dotenv": "^17.2.1",
     "serve": "^14.2.4"
   }
 }
