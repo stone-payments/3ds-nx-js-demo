@@ -174,8 +174,37 @@
 
     window.onSubmit = () => {
       submitOrder().catch(error => {
-        console.error('Error submitting order:', error);
-        showAlert('An error occurred while submitting the order.\nError: ' + error.message);
+        // Check if it's a TDSError with detailed information
+        if (error instanceof window.TDS.TDSError) {
+          // Show simple summary in alert
+          showAlert(`TDS Error: ${error.message}. Check the console for more details.`);
+          
+          // Log detailed information to console for debugging
+          console.error('TDS Error Details:', {
+            message: error.message,
+            type: error.getType(),
+            status: error.getStatus(),
+            method: error.getMethod(),
+            path: error.getPath(),
+            validationErrors: error.getValidationErrors(),
+            fullErrorResponse: error.errorResponse
+          });
+        } else if (error instanceof window.TDS.UnstructuredTDSError) {
+          // Show simple summary in alert for UnstructuredTDSError
+          showAlert(`TDS Error: ${error.message}. Check the console for more details.`);
+          
+          // Log detailed information to console for debugging
+          console.error('Unstructured TDS Error Details:', {
+            message: error.message,
+            path: error.path,
+            statusCode: error.statusCode,
+            fullErrorResponse: error.errorResponse
+          });
+        } else {
+          // Handle other types of errors
+          showAlert(`Unexpected error: ${error.message || error}`);
+        }
+        
         // Re-enable the submit button
         document.getElementById('btnSubmit').disabled = false;
       });
@@ -244,23 +273,17 @@
     {
       "payment_method": "credit_card",
       "credit_card": {
-        "operation_type": "auth_and_capture",
-        "installments": 3,
-        "statement_descriptor": "LOJA ONLINE",
         "card": {
           "number": "3000100811112072",
           "holder_name": "JOAO SILVA",
-          "holder_document": "12345678901",
           "exp_month": 12,
           "exp_year": 2028,
-          "cvv": "123",
-          "brand": "visa",
           "billing_address": {
             "country": "BR",
             "state": "SP",
             "city": "São Paulo",
             "zip_code": "01234567",
-            "line_1": "123, Rua das Flores, XXX",
+            "line_1": "123, Rua das Flores, Centro",
             "line_2": "Apartamento 45"
           }
         },
@@ -281,47 +304,14 @@
           "payment_id": "pay_original456"
         }
       },
-      "amount": 20000,
-      "split": [
-        {
-          "amount": 18000,
-          "recipient_id": "rp_main_seller",
-          "type": "percentage",
-          "options": {
-            "charge_processing_fee": true,
-            "charge_remainder_fee": false,
-            "liable": "seller"
-          }
-        },
-        {
-          "amount": 2000,
-          "recipient_id": "rp_marketplace",
-          "type": "flat",
-          "options": {
-            "charge_processing_fee": false,
-            "charge_remainder_fee": true,
-            "liable": "marketplace"
-          }
-        }
-      ]
+      "amount": 20000
     }
   ],
   "customer": {
     "name": "João Silva",
-    "type": "individual",
     "email": "joao.silva@email.com",
     "code": "CUST-001",
     "document": "12345678901",
-    "document_type": "cpf",
-    "gender": "male",
-    "address": {
-      "country": "BR",
-      "state": "SP",
-      "city": "São Paulo",
-      "zip_code": "01234567",
-      "line_1": "123, Rua das Flores, XXX",
-      "line_2": "Apartamento 45"
-    },
     "phones": {
       "home_phone": {
         "country_code": "55",
@@ -333,11 +323,6 @@
         "area_code": "11",
         "number": "123456789"
       }
-    },
-    "birthdate": "1990-05-15",
-    "metadata": {
-      "customer_segment": "premium",
-      "loyalty_level": "gold"
     }
   },
   "items": [
@@ -355,59 +340,17 @@
     }
   ],
   "shipping": {
-    "amount": 1500,
-    "description": "Entrega expressa",
     "recipient_name": "João Silva",
-    "recipient_phone": "11987654321",
     "address": {
       "country": "BR",
       "state": "SP",
       "city": "São Paulo",
       "zip_code": "01234567",
-      "line_1": "123, Rua das Flores, XXX",
+      "line_1": "123, Rua das Flores, Centro",
       "line_2": "Apartamento 45"
     }
-  },
-  "subMerchant": {
-    "merchant_category_code": "5411",
-    "payment_facilitator_code": "PF123456",
-    "code": "SUB_MERCHANT_001",
-    "name": "Loja do João Ltda",
-    "document": "12345678000195",
-    "type": "corporation",
-    "phones": {
-      "home_phone": {
-        "country_code": "55",
-        "area_code": "11",
-        "number": "33334444"
-      },
-      "mobile_phone": {
-        "country_code": "55",
-        "area_code": "11",
-        "number": "999887766"
-      }
-    },
-    "address": {
-      "country": "BR",
-      "state": "SP",
-      "city": "São Paulo",
-      "zip_code": "01234567",
-      "line_1": "Av. Comercial, 789",
-      "line_2": "Sala 101"
-    }
-  },
-  "code": "ORDER-12345",
-  "costumer_id": "customer-uuid-123",
-  "close": true,
-  "ip": "192.168.1.100",
-  "session_id": "sess_abc123def456",
-  "antifraud_enabled": true
+  }
 }`;
-
-    if (skEnv) {
-      document.getElementById('inputSecretKey').value = skEnv;
-    }
-
     document.getElementById('inputOrderJSON').value = exampleOrderJSON;
   </script>
 </body>
