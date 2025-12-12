@@ -159,7 +159,7 @@
         const token = await getToken();
 
         // This is the main function call, which will initiate the 3DS flow
-        const response = await window.Do3DS({
+        const response = await window.TDS.init({
           token,
           tdsMethodContainerElement: tdsMethodContainer,
           challengeContainerElement: challengeContainer,
