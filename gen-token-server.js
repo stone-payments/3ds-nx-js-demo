@@ -1,96 +1,69 @@
-import http from 'http';
-import https from 'https';
-import { URL } from 'url';
+import express from 'express';
+import cors from 'cors';
+import axios from 'axios';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
+const app = express();
 const PORT = process.env.PORT || 3333;
-const ALLOWED_HOSTNAMES = process.env.ALLOWED_HOSTNAMES 
-  ? process.env.ALLOWED_HOSTNAMES.split(',').map(host => host.trim())
+const ALLOWED_HOSTNAMES = process.env.ALLOWED_HOSTNAMES
+  ? process.env.ALLOWED_HOSTNAMES.split(',').map((host) => host.trim())
   : ['3ds.stone.com.br', '3ds-sdx.stone.com.br', 'api.pagar.me'];
 
-const setCORS = (res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-};
+// Middlewares
+app.use(cors());
+app.use(express.json());
 
-const server = http.createServer(async (req, res) => {
-  setCORS(res);
+// POST /gen-token
+app.post('/gen-token', async (req, res) => {
+  try {
+    const { api, secret_key } = req.body;
 
-  if (req.method === 'OPTIONS') {
-    res.writeHead(204);
-    return res.end();
-  }
+    if (typeof api !== 'string' || typeof secret_key !== 'string') {
+      return res.status(400).send('Invalid request body');
+    }
 
-  if (req.method === 'POST' && req.url === '/gen-token') {
-    let body = '';
+    const url = new URL(`${api}/tds-token`);
 
-    req.on('data', (chunk) => (body += chunk));
-    req.on('end', async () => {
-      try {
-        const { api, secret_key } = JSON.parse(body);
-        if (typeof api !== 'string' || typeof secret_key !== 'string') {
-          res.writeHead(400);
-          return res.end('Invalid request body');
-        }
+    if (!ALLOWED_HOSTNAMES.includes(url.hostname)) {
+      return res.status(403).send('Hostname not allowed');
+    }
 
-        const url = new URL(`${api}/tds-token`);
-        
-        if (!ALLOWED_HOSTNAMES.includes(url.hostname)) {
-          res.writeHead(403);
-          return res.end('Hostname not allowed');
-        }
-
-        const protocol = url.protocol === 'https:' ? https : http;
-
-        const options = {
-          hostname: url.hostname,
-          port: url.port || (url.protocol === 'https:' ? 443 : 80),
-          path: url.pathname + url.search,
-          method: 'GET',
-          headers: {
-            Authorization:
-              'Basic ' + Buffer.from(`${secret_key}:`).toString('base64'),
-          },
-        };
-
-        const tokenReq = protocol.request(options, (tokenRes) => {
-          let tokenData = '';
-          tokenRes.on('data', (chunk) => (tokenData += chunk));
-          tokenRes.on('end', () => {
-            try {
-              const parsed = JSON.parse(tokenData);
-              if (!parsed.tds_token) throw new Error('Missing tds_token');
-              res.writeHead(200, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ token: parsed.tds_token }));
-            } catch (e) {
-              console.error('Error parsing token response:', e);
-              res.writeHead(502);
-              res.end('Invalid token response');
-            }
-          });
-        });
-
-        tokenReq.on('error', () => {
-          res.writeHead(502);
-          res.end('Error fetching token');
-        });
-
-        tokenReq.end();
-      } catch (e) {
-        console.error('Error processing request:', e);
-        res.writeHead(400);
-        res.end('Invalid JSON');
-      }
+    const authHeader = 'Basic ' + Buffer.from(`${secret_key}:`).toString('base64');
+    console.log('Fetching token from:', url.toString());
+    const response = await axios.get(url.toString(), {
+      headers: {
+        Authorization: authHeader,
+      },
     });
-  } else {
-    res.writeHead(404);
-    res.end('Not Found');
+
+    if (!response.data?.tds_token) {
+      throw new Error('Missing tds_token');
+    }
+
+    res.json({ token: response.data.tds_token });
+  } catch (error) {
+    console.error('Error processing request:', error.message);
+
+    if (axios.isAxiosError(error)) {
+      console.log('Axios error details:', error);
+      return res.status(502).send('Error fetching token');
+    }
+
+    if (error instanceof SyntaxError) {
+      return res.status(400).send('Invalid JSON');
+    }
+
+    res.status(502).send('Invalid token response');
   }
 });
 
-server.listen(PORT, () => {
+// 404 handler
+app.use((_req, res) => {
+  res.status(404).send('Not Found');
+});
+
+app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
